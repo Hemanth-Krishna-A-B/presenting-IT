@@ -25,13 +25,13 @@ export default function Layout({ children }) {
     const [randomNumber, setRandomNumber] = useState(null);
     const [menuOpen, setMenuOpen] = useState(false);
 
-     useEffect(() => {
+    useEffect(() => {
         const sessionRaw = localStorage.getItem("SESSION");
         if (sessionRaw) {
             try {
                 const sessionId = JSON.parse(sessionRaw);
                 setRandomNumber(sessionId);
-                setClockActive(true); 
+                setClockActive(true);
             } catch (error) {
                 console.error("Invalid SESSION data in localStorage");
             }
@@ -78,6 +78,7 @@ export default function Layout({ children }) {
         setClockActive(!clockActive);
     };
 
+
     const handleLogout = async () => {
         if (randomNumber) {
             try {
@@ -88,16 +89,24 @@ export default function Layout({ children }) {
                 });
                 const result = await res.json();
                 if (!res.ok) throw new Error(result.error || "Failed to stop session");
+
                 localStorage.removeItem("SESSION");
                 setRandomNumber(null);
             } catch (err) {
                 alert("Error stopping session: " + err.message);
             }
         }
+
+        fetch(`https://present-it-backend-2.onrender.com/generate-report?session_id=${randomNumber}`, {
+            method: "GET",
+            keepalive: true,
+        });
+
         await supabase.auth.signOut();
         localStorage.clear();
         router.push("/");
     };
+
 
 
     return (
