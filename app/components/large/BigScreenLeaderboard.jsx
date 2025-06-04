@@ -26,17 +26,21 @@ export default function BigScreenLeaderboard() {
       setLoading(true);
       const { data: leaderboard, error } = await supabase
         .from("leaderboard")
-        .select("*")
+        .select("*") // select all fields including bank_id and time
         .eq("session_id", session_id)
-        .order("total_score", { ascending: false })
-        .order("created_at", { ascending: false })
         .limit(50);
 
       if (error) {
         console.error("Error fetching leaderboard:", error);
         setData([]);
       } else {
-        setData(leaderboard);
+        // sort client-side by bank_id desc, total_score desc, time asc
+        const sorted = (leaderboard || []).sort((a, b) => {
+          if (b.bank_id !== a.bank_id) return b.bank_id - a.bank_id;
+          if (b.total_score !== a.total_score) return b.total_score - a.total_score;
+          return a.time - b.time; // smaller time is better
+        });
+        setData(sorted);
       }
       setLoading(false);
     };
@@ -79,9 +83,9 @@ export default function BigScreenLeaderboard() {
   return (
     <div className="w-full rounded-lg max-h-[90vh] overflow-y-auto">
       <ul className="space-y-3">
-        {data.map(({ regno, total_score, created_at }, index) => (
+        {data.map(({ regno, total_score, created_at, bank_id, time }, index) => (
           <li
-            key={regno} // regno assumed unique
+            key={`${regno}-${bank_id}`} // unique key using regno + bank_id
             className={`flex justify-between items-start bg-gray-100 px-3 py-2 rounded-md ${
               index === 0 ? "bg-yellow-100 border border-yellow-400" : ""
             }`}
@@ -108,6 +112,8 @@ export default function BigScreenLeaderboard() {
             <div className="text-right">
               <div className="text-sm font-semibold">{total_score.toFixed(2)} pts</div>
               <div className="text-xs text-gray-500 mt-1">{new Date(created_at).toLocaleTimeString()}</div>
+              <div className="text-xs text-gray-500 mt-1">Bank ID: {bank_id}</div>
+              <div className="text-xs text-gray-500 mt-1">Time: {time}</div>
             </div>
           </li>
         ))}

@@ -184,7 +184,7 @@ export default function SessionControls() {
   }
 
   return (
-    <div className="w-full rounded-lg max-h-[90vh] overflow-y-auto bg-white shadow-md p-4 flex flex-col gap-6">
+   <div className="w-full rounded-lg max-h-[90vh] lg:max-h-none lg:overflow-visible overflow-y-auto bg-white shadow-md p-4 flex flex-col gap-6">
       <h2 className="text-lg font-semibold text-center text-gray-800">🛠️ Session Settings</h2>
 
       <button
@@ -222,7 +222,7 @@ export default function SessionControls() {
         Students: <span>{studentCount}</span>
       </div>
 
-      <div className="flex justify-center mb-20">
+      <div className="flex justify-center max-sm:mb-20">
         <button
           onClick={handleToggleLeaderboard}
           className="px-4 py-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm font-semibold"

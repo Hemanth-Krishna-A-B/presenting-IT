@@ -1,123 +1,210 @@
 "use client";
-
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 export default function PresentationViewer() {
-  const [images, setImages] = useState([]); // array of slide image URLs
-  const [currentSet, setCurrentSet] = useState(null); // current presentationId
-  const [currentIndex, setCurrentIndex] = useState(0); // current slide index
-  const [channel, setChannel] = useState(null);
+  const [userId, setUserId] = useState(null);
+  const [sessionData, setSessionData] = useState(null);
+  const [roomId, setRoomId] = useState(null);
+  const [currentPresentation, setCurrentPresentation] = useState(null);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [currentImageUrl, setCurrentImageUrl] = useState(null);
+  const [fade, setFade] = useState(true);
+  const [currentId, setCurrentId] = useState(null);
 
-  const roomId = typeof window !== "undefined" ? localStorage.getItem("ROOM-ID") : null;
-  const studentData = typeof window !== "undefined" ? localStorage.getItem("STUDENT") : null;
-  
-  let userId = null;
-  if (studentData) {
-    try {
-      userId = JSON.parse(studentData).regNo;
-    } catch {
-      userId = null;
-    }
-  }
+  const currentIdRef = useRef(null); // ✅ Ref to track the latest currentId
+  const channelRef = useRef(null);
+  const imageContainerRef = useRef(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Fetch images for a given presentation ID
-  const fetchPresentationImages = async (presentationId) => {
-    if (!presentationId) {
-      setImages([]);
-      return;
-    }
-    const { data, error } = await supabase
+  // Keep ref in sync with state
+  useEffect(() => {
+    currentIdRef.current = currentId;
+  }, [currentId]);
+
+  // Fetch session data on first load
+  useEffect(() => {
+    const fetchSession = async () => {
+      const sessionId = localStorage.getItem("SESSION");
+      if (!sessionId) return;
+
+      const { data, error } = await supabase
+        .from("session")
+        .select("*")
+        .eq("id", sessionId)
+        .single();
+
+      if (error) {
+        console.error("❌ Error fetching session:", error);
+      } else {
+        console.log("✅ Session data loaded:", data);
+        setSessionData(data);
+      }
+    };
+
+    fetchSession();
+  }, []);
+
+  // Reusable function to fetch a presentation by id
+  const fetchPresentationById = async (pid) => {
+    const { data: presentation, error } = await supabase
       .from("presentation")
-      .select("image_url")
-      .eq("id", presentationId)
+      .select("*")
+      .eq("id", pid)
       .single();
 
     if (error) {
-      console.error("Error fetching presentation images:", error);
-      setImages([]);
+      alert("❌ Error fetching presentation");
+      return null;
+    }
+    return presentation;
+  };
+
+  // Fetch presentation when sessionData changes
+  useEffect(() => {
+    if (!sessionData?.present_id) return;
+
+    const loadInitialPresentation = async () => {
+      const presentation = await fetchPresentationById(sessionData.present_id);
+      if (presentation) {
+        setCurrentPresentation(presentation);
+        setCurrentId(presentation.id);
+        currentIdRef.current = presentation.id;
+        setCurrentImageIndex(0);
+      }
+    };
+
+    loadInitialPresentation();
+  }, [sessionData]);
+
+  // Fade effect on image change
+  useEffect(() => {
+    if (!currentPresentation?.image_url) return;
+
+    setFade(false);
+
+    const timeout = setTimeout(() => {
+      const clampedIndex = Math.min(
+        Math.max(currentImageIndex, 0),
+        currentPresentation.image_url.length - 1
+      );
+      setCurrentImageUrl(currentPresentation.image_url[clampedIndex]);
+      setFade(true);
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [currentImageIndex, currentPresentation]);
+
+  // Fetch user and room from localStorage
+  useEffect(() => {
+    const storedStudent = localStorage.getItem("STUDENT");
+    const storedRoom = localStorage.getItem("ROOM-ID");
+
+    if (storedStudent && storedRoom) {
+      setUserId(JSON.parse(storedStudent)?.studentId);
+      setRoomId(storedRoom);
+    }
+  }, []);
+
+  // Handle slide and presentation change
+  const handleSlideChange = async (pid, index) => {
+    console.log("Received slide change for:", pid, index);
+    console.log("Current ID in ref:", currentIdRef.current);
+
+    if (currentIdRef.current !== pid) {
+      if(pid == null){
+        setCurrentId(null);
+        setCurrentPresentation(null);
+      }
+      setCurrentId(pid);
+      currentIdRef.current = pid;
+
+      const presentation = await fetchPresentationById(pid);
+      if (presentation) {
+        setCurrentPresentation(presentation);
+        setCurrentImageIndex(0);
+      }
     } else {
-      // Expecting image_url is an array of URLs
-      setImages(data?.image_url || []);
+      setCurrentImageIndex(index);
     }
   };
 
-  // Effect to subscribe to presence channel and handle presence updates
+  // Subscribe to Supabase realtime channel
   useEffect(() => {
-    if (!roomId || !userId) return;
+    if (!userId || !roomId) return;
 
-    const ch = supabase.channel(`room:${roomId}`, {
-      config: { presence: { key: userId } },
+    const channel = supabase.channel(`room:${roomId}`);
+
+    channel.on("broadcast", { event: "slide-changed" }, (payload) => {
+      const { presentationId, slideIndex } = payload.payload;
+      handleSlideChange(presentationId, slideIndex);
     });
 
-    // Listen for presence sync event if needed
-    ch.on("presence", { event: "sync" }, () => {
-      // Could get the whole presence state here if needed
-    });
-
-    // Listen for presence track event (when users update their presence data)
-    ch.on("presence", { event: "track" }, (payload) => {
-      if (payload.presence && payload.presence.length > 0) {
-        const presenceData = payload.presence[payload.presence.length - 1].payload;
-
-        if (presenceData) {
-          const { presentationId, slideIndex } = presenceData;
-
-          if (
-            presentationId !== currentSet ||
-            slideIndex !== currentIndex
-          ) {
-            setCurrentSet(presentationId);
-            setCurrentIndex(slideIndex);
-          }
-        }
-      }
-    });
-
-    ch.subscribe((status) => {
+    channel.subscribe((status) => {
       if (status === "SUBSCRIBED") {
-        console.log("✅ Subscribed to room:", `room:${roomId}`);
-
-        // Track presence with empty or initial data to join presence
-        ch.track({
-          key: userId,
-          user: { regno: userId, presentationId: null, slideIndex: 0 },
-        });
+        console.log(`✅ Subscribed to room:${roomId}`);
       }
     });
 
-    setChannel(ch);
+    channelRef.current = channel;
 
     return () => {
-      supabase.removeChannel(ch);
-      setChannel(null);
+      if (channelRef.current) {
+        channelRef.current.unsubscribe();
+        channelRef.current = null;
+      }
     };
-  }, [roomId, userId, currentSet, currentIndex]);
+  }, [userId, roomId]);
 
-  // When currentSet changes, fetch images for that presentation
-  useEffect(() => {
-    if (currentSet) {
-      fetchPresentationImages(currentSet);
+  // Fullscreen toggle
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      imageContainerRef.current?.requestFullscreen().then(() => setIsFullscreen(true));
     } else {
-      setImages([]);
+      document.exitFullscreen().then(() => setIsFullscreen(false));
     }
-  }, [currentSet]);
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-4xl mx-auto bg-white shadow-xl rounded-2xl p-6 flex justify-center items-center min-h-[300px]">
-        {images.length > 0 && images[currentIndex] ? (
-          <img
-            src={images[currentIndex]}
-            alt={`Slide ${currentIndex + 1}`}
-            className="max-w-full max-h-[70vh] rounded-xl object-contain"
-          />
-        ) : (
-          <div className="text-gray-500 text-xl font-medium">
-            Nothing Shared Yet
+    <div className="flex flex-col h-screen p-4">
+      {currentPresentation ? (
+        <main className="flex-grow flex flex-col">
+          <div className="mb-2 text-center px-2">
+            <h3 className="text-2xl sm:text-4xl font-bold truncate">
+              {currentPresentation.title}
+            </h3>
+            <p className="text-sm sm:text-base mt-1 truncate">{currentPresentation.description}</p>
           </div>
-        )}
-      </div>
+
+          {currentImageUrl ? (
+            <div
+              ref={imageContainerRef}
+              className="flex-grow relative flex justify-center items-center overflow-hidden rounded-lg "
+            >
+              <img
+                src={currentImageUrl}
+                alt={`Slide ${currentImageIndex + 1}`}
+                draggable={false}
+                className={`max-w-full max-h-full object-contain select-none transition-opacity duration-300 ${
+                  fade ? "opacity-100" : "opacity-0"
+                }`}
+              />
+
+              <button
+                onClick={toggleFullscreen}
+                className="absolute top-4 right-4 bg-opacity-70 hover:bg-opacity-90 bg-red-400 px-3 py-1 rounded-md text-sm"
+                aria-label={isFullscreen ? "Exit fullscreen" : "View fullscreen"}
+              >
+                {isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+              </button>
+            </div>
+          ) : (
+            <p className="text-center mt-auto">No images available.</p>
+          )}
+        </main>
+      ) : (
+        <p className="text-center mt-auto">Seems like nothing to show :)</p>
+      )}
     </div>
   );
 }

@@ -1,22 +1,14 @@
-import CircularAvatar from "./circularAvatar";
 import Dataset from "./dataset";
-import ImageSlider from "./ImageSlider";
 import "../../globals.css";
 import PollDonutSlider from "./PollDonutSlider";
 import LeaderboardList from "./LeaderboardList";
 import SessionControls from "./SessionControls";
 import AvatarRow from "../AvatarRow";
+import ImageViewer from "../large/ImageViewer";
+import BigScreenLeaderboard from "../large/BigScreenLeaderboard";
 
 export default function MobileAdminDashboard() {
 
-  const leaderboardData = [
-    { roll: "21CS001", marks: 98, time: "10:02" },
-    { roll: "21CS023", marks: 95, time: "10:45" },
-    { roll: "21CS017", marks: 90, time: "11:12" },
-    { roll: "21CS011", marks: 88, time: "11:30" },
-    { roll: "21CS027", marks: 85, time: "12:10" },
-    { roll: "21CS030", marks: 82, time: "12:40" },
-  ];
 
 
   return (
@@ -30,7 +22,7 @@ export default function MobileAdminDashboard() {
 
         {/* Manual Image Slider */}
         <div className="w-full px-2">
-          <ImageSlider />
+          <ImageViewer />
         </div>
 
         {/* Dataset Component */}
@@ -43,15 +35,16 @@ export default function MobileAdminDashboard() {
           <PollDonutSlider/>
         </div>
 
-        {/* Leaderboard */}
-        <div className="w-full px-2 mb-6 rounded-md">
-          <LeaderboardList/>
-        </div>
-
         {/* Session Controls */}
         <div className="w-full px-2 rounded-md">
           <SessionControls/>
         </div>
+        {/* Leaderboard */}
+        <div className="w-full px-2 mb-6 rounded-md">
+          <h2 className="font-semibold text-lg mb-2 mt-4 text-center">🏆 Leaderboard</h2>
+          <BigScreenLeaderboard/>
+        </div>
+
 
       </div>
     </div>

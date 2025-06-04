@@ -1,4 +1,4 @@
-"use client"
+"use client";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -10,6 +10,21 @@ export default function LeaderboardPanel() {
     const roomId = localStorage.getItem("ROOM-ID");
 
     async function fetchLeaderboard() {
+      const { data: d1, error: er1 } = await supabase
+        .from("session")
+        .select("leaderboard")
+        .eq("id", sessionId)
+        .single();
+
+      if (er1) {
+        console.error("Error fetching session leaderboard flag:", er1);
+        return;
+      }
+
+      if (!d1.leaderboard) {
+        return;
+      }
+
       const { data, error } = await supabase
         .from("leaderboard")
         .select("*")
@@ -18,7 +33,13 @@ export default function LeaderboardPanel() {
       if (error) {
         console.error("Error fetching leaderboard:", error);
       } else {
-        setLeaderboard(data || []);
+        // Sort by descending bank_id, then descending total_score, then ascending time
+        const sorted = (data || []).sort((a, b) => {
+          if (b.bank_id !== a.bank_id) return b.bank_id - a.bank_id;
+          if (b.total_score !== a.total_score) return b.total_score - a.total_score;
+          return a.time - b.time; // smaller time is better
+        });
+        setLeaderboard(sorted);
       }
     }
 
@@ -36,7 +57,6 @@ export default function LeaderboardPanel() {
         },
         (payload) => {
           console.log("Realtime leaderboard update:", payload);
-
           fetchLeaderboard();
         }
       )
@@ -58,30 +78,37 @@ export default function LeaderboardPanel() {
               <th className="px-4 py-3 text-left">Rank</th>
               <th className="px-4 py-3 text-left">User</th>
               <th className="px-4 py-3 text-left">Score</th>
+              <th className="px-4 py-3 text-left">Bank ID</th>
+              <th className="px-4 py-3 text-left">Time</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-100">
             {leaderboard.map((user, index) => (
-              <tr key={user.regno} className="hover:bg-gray-50">
+              <tr
+                key={`${user.regno}-${user.bank_id}`}
+                className="hover:bg-gray-50"
+              >
                 <td className="px-4 py-3 font-medium">#{index + 1}</td>
                 <td className="px-4 py-3 flex items-center gap-3">
                   <span
                     className={`inline-flex items-center justify-center p-3 text-black font-bold text-sm shadow
-                        ${index === 0
-                        ? "bg-amber-400 text-white"
-                        : index === 1
+                      ${
+                        index === 0
+                          ? "bg-amber-400 text-white"
+                          : index === 1
                           ? "bg-slate-300 text-black"
                           : index === 2
-                            ? "bg-yellow-700 text-white"
-                            : "bg-white"
-                              }
-                      `}
+                          ? "bg-yellow-700 text-white"
+                          : "bg-white"
+                      }
+                    `}
                   >
                     {user.regno.toUpperCase()}
                   </span>
-
                 </td>
                 <td className="px-4 py-3 font-semibold">{user.total_score}</td>
+                <td className="px-4 py-3 font-semibold">{user.bank_id}</td>
+                <td className="px-4 py-3 font-semibold">{user.time}</td>
               </tr>
             ))}
           </tbody>

@@ -35,7 +35,6 @@ export async function POST(request) {
       );
     }
 
-    console.log(polls,questionbank);// this is to be erased
     return NextResponse.json({
       polls: polls || [],
       questionbank: questionbank || [],

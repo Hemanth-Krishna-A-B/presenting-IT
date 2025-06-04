@@ -10,41 +10,67 @@ export default function ImageViewer() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [userId, setUserId] = useState(null);
   const [roomId, setRoomId] = useState(null);
-  const [channel, setChannel] = useState(null);
-  const sliderRef = useRef(null);
+  const [channelReady, setChannelReady] = useState(false); // NEW: track channel subscription readiness
 
-  // Get current user and roomId
+  const sliderRef = useRef(null);
+  const channelRef = useRef(null);
+
+  // Get current user and roomId from user metadata
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUserId(user.id);
-        setRoomId(user.user_metadata?.room_id);
-      }
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      setUserId(user.id);
+      setRoomId(JSON.parse(localStorage.getItem("USER")).room_id);
     };
     getUser();
   }, []);
 
-  // Join Realtime Presence
+  // Join Realtime Presence channel
   useEffect(() => {
-    if (!roomId || !userId) return;
-
-    const ch = supabase.channel(`room:${roomId}`, {
-      config: { presence: { key: userId } },
-    });
-
+    if (!roomId || !userId) {
+      return;
+    }
+    console.log(roomId);
+    const ch = supabase.channel(`room:${roomId}`);
+    const data = `room:${roomId}`;
     ch.subscribe((status) => {
       if (status === "SUBSCRIBED") {
-        console.log("✅ Subscribed to", `room:${roomId}`);
+        console.log("✅ im Subscribed to: ", data);
+        setChannelReady(true); // mark channel ready here
       }
     });
 
-    setChannel(ch);
+    channelRef.current = ch;
 
     return () => {
-      supabase.removeChannel(ch);
+      if (channelRef.current) {
+        channelRef.current.unsubscribe();
+        channelRef.current = null;
+      }
+      setChannelReady(false); // reset on cleanup
     };
   }, [roomId, userId]);
+
+  // Listen for incoming slide changes broadcast
+  useEffect(() => {
+    if (!channelRef.current) return;
+
+    const listener = channelRef.current.on(
+      "broadcast",
+      { event: "slide-changed" },
+      (payload) => {
+        if (payload.presentationId !== currentSet) {
+          setCurrentSet(payload.presentationId);
+        }
+        setCurrentIndex(payload.slideIndex);
+      }
+    );
+
+    return () => {
+    };
+  }, [currentSet]);
 
   // Fetch teacher's presentations
   useEffect(() => {
@@ -72,28 +98,44 @@ export default function ImageViewer() {
       ? slideData.find((s) => s.id === currentSet)?.image_url || []
       : [];
 
-  const goToSlide = (index) => {
+  const goToSlide = async (index) => {
     const clamped = Math.max(0, Math.min(index, images.length - 1));
     setCurrentIndex(clamped);
+
     if (sliderRef.current) {
       sliderRef.current.scrollTo({
-        left: clamped * sliderRef.current.offsetWidth,
+        left: clamped * sliderRef.current.clientWidth,
         behavior: "smooth",
       });
     }
 
-    // 🟡 Broadcast slide change
-    channel?.track({
-      presentationId: currentSet,
-      slideIndex: clamped,
-    });
+    if (channelRef.current) {
+      await channelRef.current.send({
+        type: "broadcast",
+        event: "slide-changed",
+        payload: {
+          presentationId: currentSet,
+          slideIndex: clamped,
+        },
+      });
+      console.log(`Broadcasted slide-changed with id ${currentSet} to channel ${roomId}`);
+    }
   };
 
+
   useEffect(() => {
-    if (currentSet !== null) goToSlide(0);
+    if (currentSet !== null) {
+      goToSlide(0);
+    }
   }, [currentSet]);
 
   const updatePresentation = async (presentation_id) => {
+    if (!channelReady) {
+      console.warn("Channel not ready yet, cannot update presentation");
+      return;
+    }
+
+
     const session_id = localStorage.getItem("SESSION");
     if (!session_id || !presentation_id) return;
 
@@ -104,19 +146,36 @@ export default function ImageViewer() {
     });
 
     const result = await res.json();
+
     if (result.success) {
       console.log("✅ Session updated");
       setCurrentSet(presentation_id);
+      setCurrentIndex(0);
 
-      // 🟡 Broadcast new presentation with first slide
-      channel?.track({
-        presentationId: presentation_id,
-        slideIndex: 0,
-      });
+      if (channelRef.current) {
+        await channelRef.current.send({
+          type: "broadcast",
+          event: "slide-changed",
+          payload: {
+            presentationId: presentation_id,
+            slideIndex: 0,
+          },
+        });
+        console.log(`Broadcasted slide-changed with id ${presentation_id} to channel ${roomId}`);
+      }
     } else {
       console.error("❌ Update failed:", result.error);
     }
   };
+
+  // Show loading if channel is not ready yet and userId/roomId exist (means still connecting)
+  if ((userId && roomId) && !channelReady) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p>Connecting to room...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full h-full flex flex-col bg-white rounded-lg shadow overflow-hidden">
@@ -125,7 +184,6 @@ export default function ImageViewer() {
         {currentSet !== null && (
           <button
             onClick={() => {
-              setCurrentSet(null);
               setCurrentIndex(0);
             }}
             className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
@@ -144,7 +202,8 @@ export default function ImageViewer() {
               <div
                 key={set.id}
                 onClick={() => updatePresentation(set.id)}
-                className="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-100 cursor-pointer transition"
+                className={`flex items-center gap-4 p-3 rounded-lg hover:bg-gray-100 cursor-pointer transition ${!channelReady ? "opacity-50 pointer-events-none" : ""
+                  }`}
               >
                 <img
                   src={
@@ -156,9 +215,7 @@ export default function ImageViewer() {
                   className="w-24 h-16 object-cover rounded-md shadow-sm"
                 />
                 <div>
-                  <h3 className="text-lg font-medium text-gray-800">
-                    {set.title}
-                  </h3>
+                  <h3 className="text-lg font-medium text-gray-800">{set.title}</h3>
                   <p className="text-sm text-gray-500">
                     {Array.isArray(set.image_url)
                       ? `${set.image_url.length} images`
@@ -205,9 +262,8 @@ export default function ImageViewer() {
             {images.map((_, idx) => (
               <div
                 key={idx}
-                className={`w-3 h-3 rounded-full ${
-                  idx === currentIndex ? "bg-white" : "bg-white/50"
-                }`}
+                className={`w-3 h-3 rounded-full ${idx === currentIndex ? "bg-white" : "bg-white/50"
+                  }`}
               />
             ))}
           </div>

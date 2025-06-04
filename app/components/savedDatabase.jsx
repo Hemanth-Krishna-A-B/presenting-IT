@@ -1,4 +1,5 @@
 "use client";
+
 import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 
@@ -13,6 +14,7 @@ export default function SavedDatabase() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  // Fetch saved data on mount
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
@@ -55,15 +57,43 @@ export default function SavedDatabase() {
 
   const filteredItems = items.filter((item) => {
     const matchesType = filter === "all" || item.type === filter;
-    const matchesSearch = item.title
-      ?.toLowerCase()
-      .includes(searchQuery.toLowerCase());
+    // Use 'title' or fallback to appropriate field depending on type
+    const title = item.title || item["bank-title"] || "";
+    const matchesSearch = title.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesType && matchesSearch;
   });
 
-  const handleDelete = (id) => {
-    alert(`Delete item with ID: ${id}`);
-    // Implement delete logic here
+  const handleDelete = async (type, id) => {
+    if (!confirm("Are you sure you want to delete this item?")) return;
+
+    setLoading(true);
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData?.user?.id) {
+      alert("User not authenticated");
+      setLoading(false);
+      return;
+    }
+    const teacher_id = userData.user.id;
+
+    const res = await fetch("/api/deleteSavedItem", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type, id, teacher_id }),
+    });
+
+    
+
+    if (!res.ok) {
+      alert("Failed to delete item");
+      setLoading(false);
+      return;
+    }
+
+    // Remove the deleted item from state to update UI
+    setItems((prev) =>
+      prev.filter((item) => !(item.type === type && item.id === id))
+    );
+    setLoading(false);
   };
 
   return (
@@ -108,33 +138,39 @@ export default function SavedDatabase() {
       {/* Items Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
         {filteredItems.length > 0 ? (
-          filteredItems.map((item) => (
-            <div
-              key={`${item.type}-${item.id}`}
-              className="relative group bg-white border border-gray-300 shadow-md rounded-lg p-4 transition hover:shadow-xl hover:border-amber-400"
-            >
-              <div className="mb-2">
-                <span className="text-xs uppercase font-semibold text-amber-600">
-                  {item.type}
-                </span>
-                <h3 className="text-lg font-bold text-gray-800 mt-1">
-                  {item.title}
-                </h3>
-              </div>
+          filteredItems.map((item) => {
+            // Choose title and description based on type
+            const title = item.title || item["bank-title"] || "Untitled";
+            const description = item.description || "";
 
-              <p className="text-gray-600 text-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 mt-2">
-                {item.description}
-              </p>
-
-              <button
-                onClick={() => handleDelete(item.id)}
-                className="absolute top-3 right-3 text-red-500 hover:text-red-600 transition"
-                aria-label="Delete item"
+            return (
+              <div
+                key={`${item.type}-${item.id}`}
+                className="relative group bg-white border border-gray-300 shadow-md rounded-lg p-4 transition hover:shadow-xl hover:border-amber-400"
               >
-                🗑️
-              </button>
-            </div>
-          ))
+                <div className="mb-2">
+                  <span className="text-xs uppercase font-semibold text-amber-600">
+                    {item.type}
+                  </span>
+                  <h3 className="text-lg font-bold text-gray-800 mt-1">
+                    {title}
+                  </h3>
+                </div>
+
+                <p className="text-gray-600 text-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 mt-2">
+                  {description}
+                </p>
+
+                <button
+                  onClick={() => handleDelete(item.type, item.id)}
+                  className="absolute top-3 right-3 text-red-500 hover:text-red-600 transition"
+                  aria-label="Delete item"
+                >
+                  🗑️
+                </button>
+              </div>
+            );
+          })
         ) : (
           !loading && (
             <p className="text-gray-500 text-center col-span-full">
