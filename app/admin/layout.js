@@ -62,6 +62,7 @@ export default function Layout({ children }) {
         } else {
             if (!randomNumber) return; // no session to stop
             try {
+
                 const res = await fetch("/api/stopSession", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -71,6 +72,11 @@ export default function Layout({ children }) {
                 if (!res.ok) throw new Error(result.error || "Failed to stop session");
                 localStorage.removeItem("SESSION");
                 setRandomNumber(null);
+                fetch(`https://present-it-backend-2.onrender.com/generate-report?session_id=${randomNumber}`, {
+                    method: "POST",
+                    keepalive: true,
+                });
+
             } catch (err) {
                 alert("Error stopping session: " + err.message);
             }
@@ -98,7 +104,7 @@ export default function Layout({ children }) {
         }
 
         fetch(`https://present-it-backend-2.onrender.com/generate-report?session_id=${randomNumber}`, {
-            method: "GET",
+            method: "POST",
             keepalive: true,
         });
 

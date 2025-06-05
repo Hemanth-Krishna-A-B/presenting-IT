@@ -113,7 +113,6 @@ export default function BigScreenLeaderboard() {
               <div className="text-sm font-semibold">{total_score.toFixed(2)} pts</div>
               <div className="text-xs text-gray-500 mt-1">{new Date(created_at).toLocaleTimeString()}</div>
               <div className="text-xs text-gray-500 mt-1">Bank ID: {bank_id}</div>
-              <div className="text-xs text-gray-500 mt-1">Time: {time}</div>
             </div>
           </li>
         ))}

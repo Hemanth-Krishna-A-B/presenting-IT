@@ -6,7 +6,7 @@ export default function LeaderboardPanel() {
   const [leaderboard, setLeaderboard] = useState([]);
 
   useEffect(() => {
-    const sessionId = localStorage.getItem("SESSION");
+    const sessionId = localStorage.getItem("SESSION-ID");
     const roomId = localStorage.getItem("ROOM-ID");
 
     async function fetchLeaderboard() {
