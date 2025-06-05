@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import FormattedText from "@/app/components/FormattedText";
 
 export default function QuestionPage() {
   const [questions, setQuestions] = useState(null);
@@ -266,7 +267,11 @@ export default function QuestionPage() {
       </div>
 
       <div className="bg-white rounded-xl shadow p-4 space-y-4">
-        <h2 className="text-lg font-semibold">{q.title}</h2>
+
+
+        <h2 className="text-lg font-semibold"><FormattedText content={q.title} /></h2>
+
+
         {q.image_url && (
           <img
             src={q.image_url}
@@ -282,7 +287,7 @@ export default function QuestionPage() {
               onClick={() => handleAnswer(opt)}
               className="px-4 py-2 rounded border hover:bg-blue-100 disabled:opacity-50"
             >
-              {opt}
+              <FormattedText content={opt} />
             </button>
           ))}
         </div>

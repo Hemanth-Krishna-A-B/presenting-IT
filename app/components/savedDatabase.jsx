@@ -2,11 +2,34 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
+import { BlockMath, InlineMath } from "react-katex";
+import "katex/dist/katex.min.css";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
+
+// Helper component: Render text mixed with block LaTeX ($$...$$)
+function RenderMixedLatex({ content }) {
+  // Split on block math expressions $$...$$, keep delimiters in output array
+  const parts = content.split(/(\$\$.*?\$\$)/gs);
+
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.startsWith("$$") && part.endsWith("$$")) {
+          const latex = part.slice(2, -2);
+          return <BlockMath key={i}>{latex}</BlockMath>;
+        } else {
+          // If you want to support inline math ($...$), you can further parse here
+          // For now, just render as plain text
+          return <span key={i}>{part}</span>;
+        }
+      })}
+    </>
+  );
+}
 
 export default function SavedDatabase() {
   const [filter, setFilter] = useState("all");
@@ -57,7 +80,6 @@ export default function SavedDatabase() {
 
   const filteredItems = items.filter((item) => {
     const matchesType = filter === "all" || item.type === filter;
-    // Use 'title' or fallback to appropriate field depending on type
     const title = item.title || item["bank-title"] || "";
     const matchesSearch = title.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesType && matchesSearch;
@@ -81,15 +103,12 @@ export default function SavedDatabase() {
       body: JSON.stringify({ type, id, teacher_id }),
     });
 
-    
-
     if (!res.ok) {
       alert("Failed to delete item");
       setLoading(false);
       return;
     }
 
-    // Remove the deleted item from state to update UI
     setItems((prev) =>
       prev.filter((item) => !(item.type === type && item.id === id))
     );
@@ -132,14 +151,12 @@ export default function SavedDatabase() {
         />
       </div>
 
-      {/* Loading indicator */}
       {loading && <p className="text-center">Loading...</p>}
 
       {/* Items Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
         {filteredItems.length > 0 ? (
           filteredItems.map((item) => {
-            // Choose title and description based on type
             const title = item.title || item["bank-title"] || "Untitled";
             const description = item.description || "";
 
@@ -152,9 +169,15 @@ export default function SavedDatabase() {
                   <span className="text-xs uppercase font-semibold text-amber-600">
                     {item.type}
                   </span>
-                  <h3 className="text-lg font-bold text-gray-800 mt-1">
-                    {title}
-                  </h3>
+
+                  {/* For polls and questionbanks, render title with LaTeX support */}
+                  {(item.type === "poll" || item.type === "questionbank") ? (
+                    <h3 className="text-lg font-bold text-gray-800 mt-1">
+                      <RenderMixedLatex content={title} />
+                    </h3>
+                  ) : (
+                    <h3 className="text-lg font-bold text-gray-800 mt-1">{title}</h3>
+                  )}
                 </div>
 
                 <p className="text-gray-600 text-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 mt-2">

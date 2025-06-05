@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
+import "katex/dist/katex.min.css"; 
 
 export default function StudentLayout({ children }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);

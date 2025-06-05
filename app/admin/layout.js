@@ -15,7 +15,6 @@ export default function Layout({ children }) {
         { name: "reports", path: "/admin/reports" },
         { name: "dashboard", path: "/admin/dashboard" },
         { name: "saved", path: "/admin/database" },
-        { name: "settings", path: "/admin/settings" },
     ];
 
     const pathname = usePathname();
@@ -70,15 +69,18 @@ export default function Layout({ children }) {
                 });
                 const result = await res.json();
                 if (!res.ok) throw new Error(result.error || "Failed to stop session");
-                localStorage.removeItem("SESSION");
+
                 setRandomNumber(null);
-                fetch(`https://present-it-backend-2.onrender.com/generate-report?session_id=${randomNumber}`, {
+
+                fetch(`https://presenting-it.onrender.com/generate-report?session_id=${randomNumber}`, {
                     method: "POST",
                     keepalive: true,
                 });
 
             } catch (err) {
                 alert("Error stopping session: " + err.message);
+            } finally {
+                localStorage.removeItem("SESSION");
             }
         }
         setClockActive(!clockActive);
@@ -103,7 +105,8 @@ export default function Layout({ children }) {
             }
         }
 
-        fetch(`https://present-it-backend-2.onrender.com/generate-report?session_id=${randomNumber}`, {
+
+        fetch(`https://presenting-it.onrender.com/generate-report?session_id=${randomNumber}`, {
             method: "POST",
             keepalive: true,
         });
@@ -146,7 +149,7 @@ export default function Layout({ children }) {
                                 }`}
                             aria-pressed={clockActive}
                         >
-                            {clockActive ? `Session ID: ${randomNumber}` : "Present_IT"}
+                            {clockActive ? `Session ID: ${randomNumber == null ? " " : randomNumber}` : "Present_IT"}
                         </button>
 
                         <button

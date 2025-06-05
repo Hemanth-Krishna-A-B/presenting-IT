@@ -2,6 +2,21 @@
 
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import "katex/dist/katex.min.css";
+import { InlineMath, BlockMath } from "react-katex";
+
+// Helper to parse text and render LaTeX blocks
+const renderMixedText = (text) => {
+  const parts = text.split(/(\$\$.*?\$\$)/g); // Split by $$...$$
+  return parts.map((part, i) => {
+    if (/^\$\$.*\$\$$/.test(part)) {
+      const latex = part.replace(/\$\$/g, "");
+      return <BlockMath key={i}>{latex}</BlockMath>;
+    } else {
+      return <span key={i}>{part}</span>;
+    }
+  });
+};
 
 export default function PollPage() {
   const [polls, setPolls] = useState(null);
@@ -12,7 +27,6 @@ export default function PollPage() {
   const [stats, setStats] = useState(null);
   const [sessionId, setSessionId] = useState(null);
 
-  // Fetch a single poll
   async function fetchPoll(id) {
     const { data, error } = await supabase
       .from("polls")
@@ -26,7 +40,6 @@ export default function PollPage() {
     return data;
   }
 
-  // Fetch vote statistics
   async function fetchPollStats(pollId, optionsCount, currentSessionId) {
     const { data, error } = await supabase
       .from("poll-response")
@@ -49,7 +62,6 @@ export default function PollPage() {
     setStats(counts);
   }
 
-  // Initialization
   useEffect(() => {
     async function init() {
       const sessionId = localStorage.getItem("SESSION-ID");
@@ -80,14 +92,12 @@ export default function PollPage() {
     init();
   }, []);
 
-  // Countdown timer
   useEffect(() => {
     if (!polls || timeLeft === 0) return;
     const interval = setInterval(() => setTimeLeft((t) => t - 1), 1000);
     return () => clearInterval(interval);
   }, [timeLeft, polls]);
 
-  // Real-time DB updates listener
   useEffect(() => {
     if (!polls || !sessionId) return;
 
@@ -96,7 +106,7 @@ export default function PollPage() {
       .on(
         "postgres_changes",
         {
-          event: "*", // catch INSERT + UPDATE
+          event: "*",
           schema: "public",
           table: "poll-response",
           filter: `poll_id=eq.${polls.id}`,
@@ -110,7 +120,6 @@ export default function PollPage() {
     return () => supabase.removeChannel(channel);
   }, [polls, sessionId]);
 
-  // Handle vote
   const handleSelect = async (opt) => {
     if (timeLeft === 0) return;
     setSelected(opt);
@@ -131,7 +140,7 @@ export default function PollPage() {
     }
   };
 
-  if (!polls) return <p>Hmm...looks like nothing  to show :(</p>;
+  if (!polls) return <p>Hmm...looks like nothing to show :(</p>;
   const poll = polls;
 
   return (
@@ -142,9 +151,13 @@ export default function PollPage() {
       </div>
 
       <div className="bg-white rounded-xl shadow p-4 space-y-4">
-        <h2 className="text-lg font-semibold">{poll.title}</h2>
+        <h2 className="text-lg font-semibold">{renderMixedText(poll.title)}</h2>
         {poll.image_url && (
-          <img src={poll.image_url} alt="" className="rounded max-h-60 object-contain" />
+          <img
+            src={poll.image_url}
+            alt=""
+            className="rounded max-h-60 object-contain"
+          />
         )}
         <div className="grid grid-cols-2 gap-2">
           {poll.option.map((opt, i) => {
@@ -160,7 +173,7 @@ export default function PollPage() {
                   selected === opt ? "bg-blue-200" : "hover:bg-blue-100"
                 }`}
               >
-                <span>{opt}</span>
+                <span>{renderMixedText(opt)}</span>
                 {stats && (
                   <span className="text-sm text-gray-600 ml-2">{percent}%</span>
                 )}

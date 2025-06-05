@@ -1,6 +1,32 @@
 "use client";
+
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { BlockMath } from "react-katex";
+import "katex/dist/katex.min.css";
+
+
+function RenderMixedLatex({ content }) {
+  // Split on $$...$$ blocks (block math)
+  // This returns array with alternating text and latex blocks
+  const parts = content.split(/(\$\$.*?\$\$)/gs);
+
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.startsWith("$$") && part.endsWith("$$")) {
+          // Remove the $$ delimiters for BlockMath
+          const latex = part.slice(2, -2);
+          return <BlockMath key={i}>{latex}</BlockMath>;
+        } else {
+          // For inline math $...$ inside normal text, you can enhance parsing here
+          // but for now just render plain text
+          return <span key={i}>{part}</span>;
+        }
+      })}
+    </>
+  );
+}
 
 // LocalStorage helpers
 function getUserData() {
@@ -185,9 +211,8 @@ export default function Dataset() {
           className="inline-flex items-center cursor-pointer select-none space-x-2"
         >
           <span
-            className={`font-semibold text-sm ${
-              view === "questions" ? "text-amber-600" : "text-gray-400"
-            }`}
+            className={`font-semibold text-sm ${view === "questions" ? "text-amber-600" : "text-gray-400"
+              }`}
           >
             Questions
           </span>
@@ -201,16 +226,14 @@ export default function Dataset() {
             />
             <div className="w-full h-5 bg-gray-300 rounded-full shadow-inner" />
             <div
-              className={`dot absolute top-0.5 left-0.5 w-4 h-4 bg-amber-600 rounded-full transition-transform ${
-                view === "polls" ? "translate-x-5" : "translate-x-0"
-              }`}
+              className={`dot absolute top-0.5 left-0.5 w-4 h-4 bg-amber-600 rounded-full transition-transform ${view === "polls" ? "translate-x-5" : "translate-x-0"
+                }`}
             />
           </div>
 
           <span
-            className={`font-semibold text-sm ${
-              view === "polls" ? "text-amber-600" : "text-gray-400"
-            }`}
+            className={`font-semibold text-sm ${view === "polls" ? "text-amber-600" : "text-gray-400"
+              }`}
           >
             Polls
           </span>
@@ -231,13 +254,19 @@ export default function Dataset() {
                 key={id}
                 className="flex justify-between items-center p-3 bg-white border border-gray-200 rounded-md shadow-sm hover:shadow-md transition"
               >
-                <span className="flex-grow truncate text-gray-900">{text}</span>
+                <span className="flex-grow truncate text-gray-900">
+                  {view === "polls" ? (
+                    <RenderMixedLatex content={text} />
+                  ) : (
+                    text
+                  )}
+
+                </span>
                 <button
-                  className={`ml-4 px-4 py-1 rounded-md text-sm font-semibold transition ${
-                    isShared
+                  className={`ml-4 px-4 py-1 rounded-md text-sm font-semibold transition ${isShared
                       ? "bg-amber-600 text-white hover:bg-amber-700"
                       : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                  }`}
+                    }`}
                   onClick={() => toggleShare(view, id)}
                   aria-pressed={isShared}
                 >

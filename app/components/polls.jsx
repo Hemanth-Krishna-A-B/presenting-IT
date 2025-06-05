@@ -1,6 +1,8 @@
 "use client";
+
 import { useState } from "react";
 import { createClient } from "@supabase/supabase-js";
+import LatexTextEditor from "./LatexTextEditor";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -21,15 +23,14 @@ export default function Polls() {
       return newOptions;
     });
   };
+
   const uploadImageToServer = async (file) => {
     const formData = new FormData();
     formData.append("file", file);
-
     const res = await fetch("/api/upload-image", {
       method: "POST",
       body: formData,
     });
-
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Image upload failed");
     return data.url;
@@ -49,7 +50,6 @@ export default function Polls() {
       return alert("Please fill all poll options");
 
     setLoading(true);
-
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) {
@@ -60,12 +60,8 @@ export default function Polls() {
       const teacherId = user.id;
 
       let image_url = null;
-
       if (imageFile) {
-        if (imageFile) {
-          image_url = await uploadImageToServer(imageFile);
-        }
-
+        image_url = await uploadImageToServer(imageFile);
       }
 
       const response = await fetch("/api/polls", {
@@ -100,45 +96,27 @@ export default function Polls() {
 
       <div>
         <label className="block text-sm font-medium mb-1">Poll Question</label>
-        <textarea
-          rows={3}
-          value={pollQuestion}
-          onChange={(e) => setPollQuestion(e.target.value)}
-          className="w-full border border-gray-300 rounded-lg p-3 outline-none resize-none focus:ring-2 focus:ring-amber-400 text-black"
-          placeholder="Type your question here..."
-        />
+        <LatexTextEditor value={pollQuestion} onChange={setPollQuestion} />
       </div>
 
       <div>
         <label className="block text-sm font-medium mb-1">Optional Image</label>
-        <input
-          type="file"
-          accept="image/*"
-          onChange={handleImageUpload}
-          className="w-full"
-        />
+        <input type="file" accept="image/*" onChange={handleImageUpload} />
         {imagePreview && (
           <div className="mt-3 flex justify-center">
-            <img
-              src={imagePreview}
-              alt="Uploaded thumbnail"
-              className="max-h-40 rounded-xl shadow-md object-contain"
-            />
+            <img src={imagePreview} className="max-h-40 rounded-xl shadow-md" />
           </div>
         )}
       </div>
 
       <div>
         <label className="block text-sm font-medium mb-2">Poll Options</label>
-        <div className="space-y-3">
-          {[0, 1, 2, 3].map((index) => (
-            <input
-              key={index}
-              type="text"
-              value={pollOptions[index] || ""}
-              onChange={(e) => handleOptionChange(index, e.target.value)}
-              placeholder={`Option ${index + 1}`}
-              className="w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-amber-400 text-black"
+        <div className="space-y-4">
+          {pollOptions.map((opt, i) => (
+            <LatexTextEditor
+              key={i}
+              value={pollOptions[i]}
+              onChange={(val) => handleOptionChange(i, val)}
             />
           ))}
         </div>
@@ -148,7 +126,7 @@ export default function Polls() {
         <button
           onClick={handleSubmit}
           disabled={loading}
-          className="w-full bg-amber-500 text-white font-semibold py-3 rounded-lg hover:bg-amber-600 transition duration-300"
+          className="w-full bg-amber-500 text-white font-semibold py-3 rounded-lg hover:bg-amber-600 transition"
         >
           {loading ? "Submitting..." : "Submit Poll"}
         </button>
