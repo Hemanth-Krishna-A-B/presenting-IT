@@ -192,7 +192,7 @@ export default function ImageViewer() {
   };
 
   // Show loading if channel is not ready yet and userId/roomId exist (means still connecting)
-  if ((userId && roomId) && !channelReady) {
+  if (!channelReady) {
     return (
       <div className="flex items-center justify-center h-full">
         <p>Connecting to room...</p>
