@@ -15,17 +15,40 @@ export default function ImageViewer() {
   const sliderRef = useRef(null);
   const channelRef = useRef(null);
 
-  // Get current user and roomId from user metadata
   useEffect(() => {
     const getUser = async () => {
       const {
         data: { user },
+        error,
       } = await supabase.auth.getUser();
+
+      if (error || !user) {
+        console.error("Failed to get user:", error);
+        return;
+      }
+
+      const localUser = localStorage.getItem("USER");
+
+      if (!localUser) {
+        console.warn("USER not found in localStorage");
+        return;
+      }
+
+      const parsed = JSON.parse(localUser);
+      if (!parsed.room_id) {
+        console.warn("room_id missing in localStorage USER");
+        return;
+      }
+
+      // ✅ Now both are available and safe to use
       setUserId(user.id);
-      setRoomId(JSON.parse(localStorage.getItem("USER")).room_id);
+      setRoomId(parsed.room_id);
     };
-    getUser();
+
+    // Wait a tick to allow hydration/localStorage readiness
+    setTimeout(getUser, 100); // Optional: adjust delay if needed
   }, []);
+
 
   // Join Realtime Presence channel
   useEffect(() => {
