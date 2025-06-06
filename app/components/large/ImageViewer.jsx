@@ -66,6 +66,7 @@ export default function ImageViewer() {
     });
 
     channelRef.current = ch;
+    setChannelReady(true);
 
     return () => {
       if (channelRef.current) {
