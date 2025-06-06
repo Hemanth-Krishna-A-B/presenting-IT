@@ -4,19 +4,35 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import "katex/dist/katex.min.css";
 import { InlineMath, BlockMath } from "react-katex";
-
+import "../../globals.css";
 // Helper to parse text and render LaTeX blocks
 const renderMixedText = (text) => {
-  const parts = text.split(/(\$\$.*?\$\$)/g); // Split by $$...$$
+  const parts = text.split(/(\$\$.*?\$\$|\$.*?\$)/g); // Match both $$...$$ and $...$
+
   return parts.map((part, i) => {
     if (/^\$\$.*\$\$$/.test(part)) {
-      const latex = part.replace(/\$\$/g, "");
-      return <BlockMath key={i}>{latex}</BlockMath>;
+      const latex = part.slice(2, -2);
+      return (
+        <div key={i} className="text-base sm:text-[0.95rem] overflow-x-auto">
+          <BlockMath>{latex}</BlockMath>
+        </div>
+
+      );
+    } else if (/^\$.*\$/.test(part)) {
+      const latex = part.slice(1, -1);
+      return (
+        <span key={i} className="text-sm sm:text-base overflow-x-auto inline-block">
+          <InlineMath>{latex}</InlineMath>
+        </span>
+
+      );
     } else {
       return <span key={i}>{part}</span>;
     }
   });
 };
+
+
 
 export default function PollPage() {
   const [polls, setPolls] = useState(null);
@@ -63,6 +79,37 @@ export default function PollPage() {
   }
 
   useEffect(() => {
+  if (!roomId || !sessionId) return;
+
+  const channel = supabase.channel(`room:${roomId}`, {
+    config: {
+      broadcast: {
+        self: false,
+      },
+    },
+  });
+
+  channel
+    .on("broadcast", { event: "item_shared" }, async ({ payload }) => {
+      if (payload?.type === "polls" && payload?.id) {
+        const newPoll = await fetchPoll(payload.id);
+        if (newPoll) {
+          setPolls(newPoll);
+          setSelected(null);
+          setTimeLeft(timeout); // optionally reset timer
+          await fetchPollStats(newPoll.id, newPoll.option.length, sessionId);
+        }
+      }
+    })
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [roomId, sessionId, timeout]);
+
+
+  useEffect(() => {
     async function init() {
       const sessionId = localStorage.getItem("SESSION-ID");
       const student = JSON.parse(localStorage.getItem("STUDENT"));
@@ -81,7 +128,7 @@ export default function PollPage() {
 
       setTimeoutVal(session.timeout * 60);
       setTimeLeft(session.timeout * 60);
-
+      if (session.p_id == null) return
       const pollData = await fetchPoll(session.p_id);
       if (pollData) {
         setPolls(pollData);
@@ -144,22 +191,29 @@ export default function PollPage() {
   const poll = polls;
 
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-4">
-      <div className="flex justify-between">
+    <div className="p-4 sm:p-6 max-w-2xl mx-auto space-y-4">
+      <div className="flex flex-col sm:flex-row justify-between gap-2">
         <h1 className="text-xl font-bold">Poll</h1>
-        <p className="text-red-600">Time Left: {timeLeft}s</p>
+        <p className="text-red-600 text-sm sm:text-base">Time Left: {timeLeft}s</p>
       </div>
 
-      <div className="bg-white rounded-xl shadow p-4 space-y-4">
-        <h2 className="text-lg font-semibold">{renderMixedText(poll.title)}</h2>
+      <div className="bg-white rounded-xl shadow-md p-4 space-y-4">
+        <h2 className="text-lg font-semibold break-words overflow-x-auto max-w-full">
+          {renderMixedText(poll.title)}
+        </h2>
+
+
         {poll.image_url && (
-          <img
-            src={poll.image_url}
-            alt=""
-            className="rounded max-h-60 object-contain"
-          />
+          <div className="w-full flex justify-center">
+            <img
+              src={poll.image_url}
+              alt=""
+              className="rounded max-h-60 object-contain"
+            />
+          </div>
         )}
-        <div className="grid grid-cols-2 gap-2">
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {poll.option.map((opt, i) => {
             const total = stats ? stats.reduce((a, b) => a + b, 0) : 0;
             const percent = stats && total > 0 ? Math.round((stats[i] / total) * 100) : 0;
@@ -169,13 +223,13 @@ export default function PollPage() {
                 key={i}
                 onClick={() => handleSelect(opt)}
                 disabled={timeLeft === 0}
-                className={`px-4 py-2 rounded border flex justify-between items-center ${
-                  selected === opt ? "bg-blue-200" : "hover:bg-blue-100"
-                }`}
+                className={`px-4 py-2 rounded border flex justify-between items-center w-full text-left gap-2
+                ${selected === opt ? "bg-blue-200" : "hover:bg-blue-100"}
+              `}
               >
-                <span>{renderMixedText(opt)}</span>
+                <span className="flex-1 break-words">{renderMixedText(opt)}</span>
                 {stats && (
-                  <span className="text-sm text-gray-600 ml-2">{percent}%</span>
+                  <span className="text-sm text-gray-600">{percent}%</span>
                 )}
               </button>
             );

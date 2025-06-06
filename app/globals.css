@@ -35,3 +35,12 @@ body {
   scrollbar-width: none; /* Firefox */
 }
 
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  padding: 0.25rem 0; /* some breathing room */
+}
+.katex {
+  font-size: 0.9rem; /* smaller than default */
+}

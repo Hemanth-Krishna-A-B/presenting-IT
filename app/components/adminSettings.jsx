@@ -1,157 +1,111 @@
-"use client"
-import { useState, useRef, useEffect } from "react";
+"use client";
 
-export default function AdminSettings() {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("admin@example.com");
-  const [profilePic, setProfilePic] = useState(null);
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
 
-  // To track the original state to detect changes
-  const [initialData, setInitialData] = useState({ name: "", email: "admin@example.com", profilePic: null });
-  const [isDirty, setIsDirty] = useState(false);
+export default function UserSessionInfo() {
+  const [userData, setUserData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [closing, setClosing] = useState(false);
 
-  const fileInputRef = useRef(null);
-
-  // Set initialData when component mounts or when relevant data changes externally
   useEffect(() => {
-    setInitialData({ name, email, profilePic });
+    const fetchUserData = async () => {
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError || !user) {
+        console.error("Error fetching user:", authError);
+        setLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("user_profiles")
+        .select("name, email, room_id")
+        .eq("uuid", user.id)
+        .single();
+
+      if (error) {
+        console.error("Failed to fetch user profile:", error);
+      } else {
+        setUserData(data);
+      }
+
+      setLoading(false);
+    };
+
+    fetchUserData();
   }, []);
 
-  // Check if data has changed to enable submit button
-  useEffect(() => {
-    const changed =
-      name !== initialData.name ||
-      email !== initialData.email ||
-      profilePic !== initialData.profilePic;
-    setIsDirty(changed);
-  }, [name, email, profilePic, initialData]);
+  const handleCloseSession = async () => {
+  const sessionData = JSON.parse(localStorage.getItem("SESSION"));
+  console.log(sessionData);
+  if (sessionData) {
+    return alert("Cannot clear Session when you have an active session online.");
+  }
 
-  const handleAvatarClick = () => {
-    fileInputRef.current?.click();
-  };
+  if (!userData?.room_id) return;
+  setClosing(true);
 
-  const handleProfilePicChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setProfilePic(URL.createObjectURL(file));
+  try {
+    // Get logged-in user ID from Supabase
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      console.error("Failed to get user:", userError);
+      setClosing(false);
+      return;
     }
-  };
 
-  const handleDeleteAll = () => {
-    if (confirm("Are you sure you want to delete all your data? This action cannot be undone.")) {
-      setName("");
-      setEmail("");
-      setProfilePic(null);
-      alert("All data deleted.");
-      setInitialData({ name: "", email: "", profilePic: null });
-      setIsDirty(false);
+    const userId = user.id;
+    const cleanupUrl = `https://presenting-it.onrender.com/cleanup-unused-sessions?user_id=${userId}`;
+
+    const response = await fetch(cleanupUrl, {
+      method: "POST",
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Cleanup failed: ${errorText}`);
     }
-  };
 
-  const handleExportAll = () => {
-    const data = { name, email, profilePic };
-    const dataStr = JSON.stringify(data, null, 2);
-    const blob = new Blob([dataStr], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
+    const data = await response.json();
 
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "admin-data.json";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+    if (data.sessions && data.sessions.length > 0) {
+      alert(`Closed and cleaned ${data.sessions.length} session(s).`);
+    } else {
+      alert("No active sessions to clean.");
+    }
+  } catch (error) {
+    console.error("Error during cleanup:", error);
+    alert("Failed to clean sessions: " + error.message);
+  } finally {
+    setClosing(false);
+  }
+};
 
-  const handleSubmit = () => {
-    // Replace this with your actual update logic/API call
-    console.log("Saving changes:", { name, email, profilePic });
-    alert("Changes saved!");
 
-    // Update initialData to current to reset dirty state
-    setInitialData({ name, email, profilePic });
-    setIsDirty(false);
-  };
+  if (loading) return <p className="text-gray-600">Loading user data...</p>;
 
   return (
-    <div className="w-full max-w-3xl md:max-w-2xl sm:max-w-full mx-auto px-4 md:px-6 py-6 mt-3 bg-white rounded-xl shadow-md text-black sm:rounded-none sm:mt-0 sm:shadow-none">
-      {/* Avatar Upload */}
-      <div className="flex justify-center mb-6">
-        <div
-          className="relative w-32 h-32 rounded-full overflow-hidden cursor-pointer border-4 border-amber-400 hover:border-amber-600 transition"
-          onClick={handleAvatarClick}
-          title="Click to change profile picture"
-          aria-label="Change profile picture"
-        >
-          {profilePic ? (
-            <img
-              src={profilePic}
-              alt="Profile Avatar"
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center bg-amber-200 text-amber-600 text-6xl font-bold select-none">
-              {name ? name.charAt(0).toUpperCase() : "A"}
-            </div>
-          )}
-          <input
-            type="file"
-            accept="image/*"
-            ref={fileInputRef}
-            onChange={handleProfilePicChange}
-            className="hidden"
-          />
-        </div>
-      </div>
+    <div className="bg-white rounded-xl shadow p-5 max-w-md mx-auto text-black mt-20">
+      <h2 className="text-lg font-semibold mb-4">User Info</h2>
+      <div className="mb-2"><strong>Name:</strong> {userData?.name || "N/A"}</div>
+      <div className="mb-2"><strong>Email:</strong> {userData?.email || "N/A"}</div>
+      <div className="mb-4"><strong>Room ID:</strong> {userData?.room_id || "N/A"}</div>
 
-      {/* Name Input */}
-      <div className="mb-5">
-        <label className="block text-sm font-medium mb-2">Name</label>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Enter your name"
-          className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400"
-        />
-      </div>
-
-      {/* Email Input */}
-      <div className="mb-5">
-        <label className="block text-sm font-medium mb-2">Email</label>
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Enter your email"
-          className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400"
-        />
-      </div>
-
-      {/* Buttons */}
-      <div className="flex gap-4 mb-4">
-        <button
-          onClick={handleDeleteAll}
-          className="flex-1 bg-red-500 text-white font-semibold py-3 rounded-lg hover:bg-red-600 transition duration-300"
-        >
-          Delete All Data
-        </button>
-        <button
-          onClick={handleExportAll}
-          className="flex-1 bg-amber-600 text-white font-semibold py-3 rounded-lg hover:bg-amber-700 transition duration-300"
-        >
-          Export All Data
-        </button>
-      </div>
-
-      {/* Submit Button */}
       <button
-        onClick={handleSubmit}
-        disabled={!isDirty}
-        className={`w-full py-3 rounded-lg font-semibold transition duration-300 ${isDirty
-            ? "bg-amber-500 text-white hover:bg-amber-600 cursor-pointer"
-            : "bg-gray-300 text-gray-600 cursor-not-allowed"
+        onClick={handleCloseSession}
+        disabled={closing}
+        className={`w-full py-2 rounded-md font-semibold transition ${closing ? "bg-gray-400 cursor-not-allowed" : "bg-red-500 hover:bg-red-600 text-white"
           }`}
       >
-        Save Changes
+        {closing ? "Closing..." : "Close Active Session"}
       </button>
     </div>
   );

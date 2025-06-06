@@ -15,6 +15,7 @@ export default function Layout({ children }) {
         { name: "reports", path: "/admin/reports" },
         { name: "dashboard", path: "/admin/dashboard" },
         { name: "saved", path: "/admin/database" },
+        { name: "Settings", path: "/admin/settings" },
     ];
 
     const pathname = usePathname();

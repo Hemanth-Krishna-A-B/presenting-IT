@@ -107,14 +107,15 @@ export default function QuestionPage() {
       setBankId(session.q_id);
       setTimeoutVal(session.timeout * 60);
       setTimeLeft(session.timeout * 60);
-
-      const qs = await fetchQuestions(session.q_id);
-      setQuestions(qs);
-      setCorrectCount(0);
-      setAnsweredIndices(new Set());
-      setCurrentIndex(0);
-      setAnswered(false);
-      setSubmitted(false);
+      if (session.q_id !== null) {
+        const qs = await fetchQuestions(session.q_id);
+        setQuestions(qs);
+        setCorrectCount(0);
+        setAnsweredIndices(new Set());
+        setCurrentIndex(0);
+        setAnswered(false);
+        setSubmitted(false);
+      }
     }
 
     loadInitial();
@@ -296,11 +297,10 @@ export default function QuestionPage() {
       <div className="text-right">
         <button
           onClick={next}
-          className={`bg-blue-500 text-white px-4 py-2 rounded ${
-            getNextUnansweredIndex() >= questions.length
+          className={`bg-blue-500 text-white px-4 py-2 rounded ${getNextUnansweredIndex() >= questions.length
               ? "opacity-50 cursor-not-allowed"
               : ""
-          }`}
+            }`}
           disabled={getNextUnansweredIndex() >= questions.length}
         >
           Next

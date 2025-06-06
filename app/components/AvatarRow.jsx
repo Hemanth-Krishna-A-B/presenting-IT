@@ -52,7 +52,7 @@ export default function AvatarRow({ className = "" }) {
       .channel(`room:${room_id}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "attendance" },
+        { event: "*", schema: "public", table: "attendance", filter: `session_id=eq.${session_id}`, },
         () => {
           console.log("Realtime change in attendance, refetching...");
           fetchAttendance();
@@ -69,11 +69,11 @@ export default function AvatarRow({ className = "" }) {
     <div className={`flex flex-row gap-x-2 items-center min-w-max ${className}`}>
       {avatarsData.map(({ rollno, regno }) => (
         <CircularAvatar
-          key={rollno}             
+          key={rollno}
           id={rollno}
-          name={regno}            
+          name={regno}
           className="flex-shrink-0"
-          active={true}           
+          active={true}
         />
       ))}
     </div>

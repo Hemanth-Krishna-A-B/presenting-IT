@@ -36,6 +36,18 @@ export default function HomePage() {
             Get Started
           </button>
         </Link>
+
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-6">
+          <Link href="/studentlogin">
+            <button
+
+              className="bg-green-500 hover:bg-green-600 transition text-white text-sm px-4 py-2 rounded-full font-semibold"
+            >
+              Join in a Session
+            </button>
+          </Link>
+        </div>
+
       </section>
 
       {/* Footer */}

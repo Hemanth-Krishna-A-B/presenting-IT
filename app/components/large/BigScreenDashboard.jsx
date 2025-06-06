@@ -10,7 +10,7 @@ import SessionControls from "../small/SessionControls";
 export default function BigScreenDashboard() {
 
   return (
-    <div className="min-h-screen w-full">
+    <div className="min-h-screen w-full text-black ">
       <div className="w-full p-3 overflow-x-auto hide-scrollbar">
         <AvatarRow />
       </div>

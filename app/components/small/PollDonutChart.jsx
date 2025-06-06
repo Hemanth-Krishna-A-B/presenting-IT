@@ -8,7 +8,7 @@ export default function PollDonutChart({ pollData = [] }) {
   const totalVotes = pollData.reduce((sum, entry) => sum + (entry.votes || 0), 0);
 
   if (totalVotes === 0) {
-    return <div className="text-center text-gray-500">No votes yet</div>;
+    return <div className="text-center text-black">No votes yet</div>;
   }
 
   const dataWithPercentages = pollData.map((entry) => ({
@@ -17,7 +17,7 @@ export default function PollDonutChart({ pollData = [] }) {
   }));
 
   return (
-    <div className="w-full h-72 flex flex-col items-center justify-center">
+    <div className=" text-black w-full h-72 flex flex-col items-center justify-center">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
           <Pie

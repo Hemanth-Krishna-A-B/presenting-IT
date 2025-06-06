@@ -3,14 +3,17 @@
 import { useState, useRef, useEffect } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import PollDonutChart from "./PollDonutChart";
-import { supabase } from "@/lib/supabaseClient"; // adjust to your path
+import { supabase } from "@/lib/supabaseClient";
 import "../../globals.css";
 
 export default function PollDonutSlider() {
   const [current, setCurrent] = useState(0);
   const [polls, setPolls] = useState([]);
   const sliderRef = useRef(null);
-
+  const subscriptionRef = useRef(null);
+  const [user_id, setUser] = useState(null);
+  const [session_id, setSessionId] = useState(null);
+  const [room_id, setRoomId] = useState(null);
   const length = polls.length;
 
   const goToSlide = (index) => {
@@ -24,7 +27,6 @@ export default function PollDonutSlider() {
     }
   };
 
-  // Fetch poll responses from supabase and transform to polls array
   async function fetchPollResponses(sessionId) {
     if (!sessionId) return;
     const { data, error } = await supabase
@@ -38,82 +40,96 @@ export default function PollDonutSlider() {
       return;
     }
 
-    // Transform data to polls format:
-    // Group by poll_id, create subtitle, and aggregate options+votes
     const grouped = data.reduce((acc, row) => {
-      if (!acc[row.poll_id]) acc[row.poll_id] = { subtitle: `Poll #${row.poll_id}`, data: [] };
-      acc[row.poll_id].data.push({
-        option: String(row.option),
-        votes: (acc[row.poll_id].data.find(d => d.option === String(row.option))?.votes || 0) + 1,
-      });
+      if (!acc[row.poll_id]) {
+        acc[row.poll_id] = { subtitle: `Poll #${row.poll_id}`, data: [] };
+      }
+      acc[row.poll_id].data.push(String(row.option));
       return acc;
     }, {});
 
-    // Fix votes count (count properly):
-    Object.values(grouped).forEach((poll) => {
+    const processed = Object.values(grouped).map((poll) => {
       const counts = {};
-      poll.data.forEach(({ option }) => {
+      poll.data.forEach((option) => {
         counts[option] = (counts[option] || 0) + 1;
       });
-      poll.data = Object.entries(counts).map(([option, votes]) => ({ option, votes }));
+      return {
+        subtitle: poll.subtitle,
+        data: Object.entries(counts).map(([option, votes]) => ({
+          option,
+          votes,
+        })),
+      };
     });
 
-    setPolls(Object.values(grouped));
+    setPolls(processed);
     setCurrent(0);
   }
 
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem("USER"));
-    const room_id = user?.room_id;
-    const session_id = localStorage.getItem("SESSION");
+    const setup = async () => {
+      const user = JSON.parse(localStorage.getItem("USER"));
+      const roomId = user?.room_id;
+      const sessionId = localStorage.getItem("SESSION");
 
-    if (!room_id) {
-      console.warn("No room_id found in localStorage USER");
-      setPolls([]);
-      return;
-    }
+      if (!roomId || !sessionId) {
+        console.warn("Missing room_id or session_id");
+        setPolls([]);
+        return;
+      }
 
-    if (!session_id) {
-      console.warn("No SESSION found in localStorage");
-      setPolls([]);
-      return;
-    }
+      setUser(user);
+      setRoomId(roomId);
+      setSessionId(sessionId);
 
-    // Use your full fetchPollResponses to fetch and process poll data
-    const fetchAndSetPolls = () => {
-      fetchPollResponses(session_id);
+      await fetchPollResponses(sessionId);
+
+      // Setup Realtime subscription
+      try {
+        const channel = supabase.channel(`room:${roomId}`, {
+          config: { postgres_changes: { enabled: true } },
+        });
+
+        let debounceTimer;
+
+        channel.on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "poll-response",
+            filter: `session_id=eq.${sessionId}`,
+          },
+          () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+              fetchPollResponses(sessionId);
+            }, 300);
+          }
+        );
+
+        const { error, status } = await channel.subscribe();
+
+        if (error) {
+          console.error("Subscription error:", error);
+        } else {
+          console.log("Subscription status:", status);
+        }
+
+        subscriptionRef.current = channel;
+      } catch (err) {
+        console.error("Failed to setup realtime subscription:", err);
+      }
     };
 
-    fetchAndSetPolls();
-
-    const channel = supabase.channel(`room:${room_id}`);
-
-    channel.on(
-      "postgres_changes",
-      {
-        event: "INSERT",
-        schema: "public",
-        table: "poll-response",
-        filter: `session_id=eq.${session_id}`,
-      },
-      fetchAndSetPolls
-    );
-
-    channel.on(
-      "postgres_changes",
-      {
-        event: "UPDATE",
-        schema: "public",
-        table: "poll-response",
-        filter: `session_id=eq.${session_id}`,
-      },
-      fetchAndSetPolls
-    );
-
-    channel.subscribe();
+    setup();
 
     return () => {
-      channel.unsubscribe();
+      if (subscriptionRef.current) {
+        supabase.removeChannel(subscriptionRef.current);
+        subscriptionRef.current = null;
+        console.log("Unsubscribed from realtime updates");
+      }
     };
   }, []);
 
@@ -131,17 +147,22 @@ export default function PollDonutSlider() {
   }, [current]);
 
   if (length === 0) {
-    return <div className="text-center p-4 text-gray-600">No polls to display</div>;
+    return (
+      <div className="text-center p-4 text-gray-600">No polls to display</div>
+    );
   }
 
   return (
-    <div className="relative w-full rounded-md p-4 select-none" style={{ minHeight: 320 }}>
+    <div
+      className="relative w-full rounded-md p-4 select-none text-black"
+      style={{ minHeight: 320 }}
+    >
       {/* Subtitle */}
       <div className="mb-4 text-lg font-semibold text-center">
         {polls[current]?.subtitle || "Poll Results"}
       </div>
 
-      {/* Slider Container */}
+      {/* Slider */}
       <div
         ref={sliderRef}
         className="flex w-full overflow-x-auto scroll-smooth snap-x snap-mandatory hide-scrollbar"
@@ -158,7 +179,7 @@ export default function PollDonutSlider() {
         ))}
       </div>
 
-      {/* Navigation Buttons */}
+      {/* Nav Buttons */}
       <button
         onClick={() => goToSlide(current - 1)}
         className="absolute left-1 top-1/2 transform -translate-y-1/2 bg-black/50 p-1.5 rounded-full text-white hover:bg-black/70"
@@ -178,7 +199,7 @@ export default function PollDonutSlider() {
         <ChevronRight className="w-5 h-5" />
       </button>
 
-      {/* Slide Indicators */}
+      {/* Indicators */}
       <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 flex gap-1 pointer-events-none select-none">
         {polls.map((_, index) => (
           <div

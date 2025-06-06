@@ -79,7 +79,7 @@ export default function Login() {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row min-h-screen">
+    <div className="flex flex-col lg:flex-row min-h-screen text-black">
       {/* Left Panel */}
       <div className="hidden lg:flex flex-col justify-center items-start w-full lg:w-1/2 bg-gradient-to-br from-indigo-500 to-purple-600 text-white p-12">
         <h1 className="text-4xl font-bold mb-4">Welcome to Present_it</h1>
@@ -180,7 +180,7 @@ export default function Login() {
               onClick={() => router.push('/studentlogin')}
               className="bg-green-500 hover:bg-green-600 transition text-white text-sm px-4 py-2 rounded-full font-semibold"
             >
-              Join as Student
+              Join in a Session
             </button>
           </div>
         </div>
