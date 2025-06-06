@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import Image from 'next/image';
 
 export default function Login() {
   const [isSignUp, setIsSignUp] = useState(true);
@@ -45,33 +46,33 @@ export default function Login() {
       if (error) {
         alert(error.message);
       } else {
-       
-          try {
-            const response = await fetch('/api/insert-user', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                uuid: user.id,
-                email: user.email,
-                name: user.user_metadata.full_name || 'No Name',
-              }),
-            });
 
-            const result = await response.json();
-            if(result.user){
-              localStorage.setItem("USER",JSON.stringify(result.user));
-            }
+        try {
+          const response = await fetch('/api/insert-user', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              uuid: user.id,
+              email: user.email,
+              name: user.user_metadata.full_name || 'No Name',
+            }),
+          });
 
-            if (response.ok) {
-              router.push("admin/dashboard");
-            } else {
-              alert("Error inserting user: please Try again later");
-            }
-          } catch (err) {
-            alert("Network/server error:");
-          };
+          const result = await response.json();
+          if (result.user) {
+            localStorage.setItem("USER", JSON.stringify(result.user));
+          }
+
+          if (response.ok) {
+            router.push("admin/dashboard");
+          } else {
+            alert("Error inserting user: please Try again later");
+          }
+        } catch (err) {
+          alert("Network/server error:");
+        };
       }
     }
 
@@ -91,8 +92,21 @@ export default function Login() {
         <ul className="space-y-2 text-sm text-blue-200 list-disc list-inside">
           <li>Real-time attendance & polling</li>
           <li>Live student engagement</li>
-          <li>Secure & reliable</li>
+          <li className="list-none">
+            <div className="flex justify-center">
+              <div className="rounded-xl overflow-hidden border border-blue-300 shadow-lg max-w-md">
+                <Image
+                  src="/qrcode.png"
+                  alt="QR code for attendance"
+                  width={300}
+                  height={200}
+                  className="object-contain"
+                />
+              </div>
+            </div>
+          </li>
         </ul>
+
       </div>
 
       {/* Right Panel */}
